@@ -1,0 +1,4 @@
+pytest==7.4.3
+pytest_cov==4.1.0
+PythonBasicTools==0.0.1a10
+pytest_json_report==1.5.0
