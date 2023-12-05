@@ -6,6 +6,10 @@ import os
 from typing import Optional
 
 import git
+from github import Github
+from github import Auth
+
+from src.tp_auto_correct import utils
 
 
 class Source:
@@ -21,35 +25,54 @@ class Source:
 
         self._local_path = None
         self._remote_path = None
-
+        self._repo_url = kwargs.get("repo_url", kwargs.get("url", None))
+        
+        # self.auth = Auth.Token("access_token")
+        # self.github = Github(auth=self.auth)
         self.repo_branch = kwargs.get("repo_branch", self.DEFAULT_REPO_BRANCH)
         self.repo_name = kwargs.get("repo_name", self.DEFAULT_REPO_NAME)
         self.repo = None
 
-        self._initialize_remote_path()
-        self._initialize_local_path()
-        if self.local_path is None:
-            raise RuntimeError(
-                "Something went wrong with the initialization of the local path. If the source is remote, "
-                "make sure that the remote path is correct. If the source is local, make sure that the "
-                "local path exists."
-            )
         self.working_path = kwargs.get("working_path", None)
 
     @property
     def src_path(self) -> str:
+        r"""
+        Return the source path of the object. This is the path from where to copy the source files.
+        This can be the path from a local folder or a remote repo.
+        
+        :return: The source path of the object.
+        :rtype: str
+        """
         return self._src_path
 
     @property
-    def local_path(self) -> str:
+    def local_path(self) -> Optional[str]:
+        r"""
+        Return the local path of the object. This is the path where the source files are copied to. Will
+        return None if the current object is not setup yet.
+        
+        :return: The local path of the object.
+        :rtype: str
+        """
         return self._local_path
 
     @property
-    def remote_path(self) -> str:
+    def remote_path(self) -> Optional[str]:
+        r"""
+        Return the remote path of the object or in other words the repo url if the source is remote.
+        
+        :return: The remote path of the object.
+        """
         return self._remote_path
 
     @property
     def repo_url(self) -> str:
+        r"""
+        Return the remote path of the object or in other words the repo url if the source is remote.
+
+        :return: The remote path of the object.
+        """
         return self.remote_path
 
     @property
@@ -59,51 +82,44 @@ class Source:
     @property
     def is_remote(self) -> bool:
         return not self.is_local
-
-    def _initialize_local_path(self):
-        if self.is_local:
-            self._local_path = self.src_path
-        else:
-            assert self._remote_path is not None, "remote_path must be initialized before local_path"
-            self._local_path = self._clone_repo()
-
-    def _initialize_remote_path(self):
-        if self.is_remote:
-            if self.src_path.startswith("http"):
-                self._remote_path = self.src_path
-            else:
-                self._remote_path = self.DEFAULT_REPO_URL.format(self.src_path)
-        else:
-            self._remote_path = None
+    
+    @property
+    def is_setup(self) -> bool:
+        return self.local_path is not None
 
     def copy(self, dst_path: str = None, overwrite=False):
         dst_path = dst_path or self.working_path
-        if os.path.exists(dst_path):
+        tmp_local_path = os.path.join(dst_path, os.path.basename(self.src_path))
+        if tmp_local_path == self.src_path:
+            return
+        self._local_path = tmp_local_path
+        if os.path.exists(self.local_path):
             if overwrite:
-                shutil.rmtree(dst_path)
+                shutil.rmtree(self.local_path)
             else:
-                raise RuntimeError(f"Path {dst_path} already exists. Set overwrite to True to overwrite.")
-        if self.is_local:
-            dst = os.path.join(dst_path, os.path.basename(self.local_path))
-            shutil.copytree(self.local_path, dst, dirs_exist_ok=True)
+                raise RuntimeError(f"Path {self.local_path} already exists. Set overwrite to True to overwrite.")
+        if self.is_remote:
+            self._clone_repo(self.local_path)  # TODO: need to extract the good folder at self.src_path after cloning
         else:
-            self._clone_repo(dst_path)
-            self.repo.git.checkout(self.repo_branch)
-            self.repo.git.pull()
-
+            shutil.copytree(self.src_path, self.local_path, dirs_exist_ok=True)
+    
     def _clone_repo(self, dst_path: str = None):
-        dst_path = dst_path or self.working_path
+        dst_path = dst_path or self.local_path
         self.repo_name = self.repo_url.split("/")[-1].split(".")[0]
         logging.info(f"Cloning repo {self.repo_name} from {self.repo_url} to {dst_path} ...")
         self.repo = git.Repo.clone_from(self.repo_url, dst_path, branch=self.repo_branch)
+        self.repo.git.checkout(self.repo_branch)
+        self.repo.git.pull()
         self.repo_name = self.repo.remotes.origin.url.split("/")[-1].split(".")[0]
         logging.info(f"Cloning repo {self.repo_name} from {self.repo_url} to {dst_path}. Done.")
         return self.repo
 
-    def setup_at(self, dst_path: str = None, overwrite=False) -> str:
+    def setup_at(self, dst_path: str = None, overwrite=False, **kwargs) -> str:
         dst_path = dst_path or self.working_path
         self.working_path = dst_path
         self.copy(dst_path, overwrite=overwrite)
+        if kwargs.get("debug", False):
+            print(self)
         return dst_path
 
     def send_cmd_to_process(
@@ -164,18 +180,23 @@ class SourceCode(Source):
         super().__init__(src_path, *args, **kwargs)
         self.code_root_folder = kwargs.get("code_root_folder", self.DEFAULT_CODE_ROOT_FOLDER)
         self.venv = kwargs.get("venv", self.DEFAULT_VENV)
-        self.reqs_path = kwargs.get(
-            "requirements_path", os.path.join(os.path.dirname(self.local_path), "requirements.txt")
-        )
+        self.reqs_path = kwargs.get("requirements_path", self.find_requirements_path())
 
     @property
     def is_venv_created(self):
         return os.path.exists(self.get_venv_path())
+    
+    def find_requirements_path(self) -> Optional[str]:
+        local_root = os.path.join(self.src_path, "..")
+        return utils.find_filepath("requirements.txt", root=local_root)
 
-    def setup_at(self, dst_path: str = None, overwrite=True):
+    def setup_at(self, dst_path: str = None, overwrite=True, **kwargs):
         dst_path = super().setup_at(dst_path, overwrite=overwrite)
         venv_stdout = self.maybe_create_venv()
         reqs_stdout = self.install_requirements()
+        if kwargs.get("debug", False):
+            print(f"venv_stdout: {venv_stdout}")
+            print(f"reqs_stdout: {reqs_stdout}")
         return dst_path
 
     def get_venv_path(self, dst_path: str = None) -> str:
@@ -191,7 +212,7 @@ class SourceCode(Source):
             shutil.rmtree(venv_path)
         if not os.path.exists(venv_path):
             logging.info(f"Creating venv at {venv_path} ...")
-            stdout = self.send_cmd_to_process(f"python -m venv {self.venv}", cwd=dst_path)
+            stdout = self.send_cmd_to_process(f"python -m venv {venv_path}", cwd=dst_path)
             logging.info(f"Creating venv -> Done. stdout: {stdout}")
         return stdout
 
@@ -207,6 +228,8 @@ class SourceCode(Source):
         )
 
     def install_requirements(self):
+        if self.reqs_path is None:
+            return "No requirements.txt file found."
         return self.send_cmd_to_process(
             f"{self.get_venv_python_path()} -m pip install -r {self.reqs_path}",
             cwd=self.working_path
@@ -230,10 +253,19 @@ class SourceTests(Source):
     def __init__(self, src_path, *args, **kwargs):
         super().__init__(src_path, *args, **kwargs)
 
-    def get_source_tests(self):
-        pass
-
-
-
-
-
+    def setup_at(self, dst_path: str = None, overwrite=True, **kwargs):
+        dst_path = super().setup_at(dst_path, overwrite=overwrite)
+        return dst_path
+    
+    def rename_test_files(self, dst_path: str = None, pattern: str = "{}_"):
+        dst_path = dst_path or self.local_path
+        assert os.path.exists(dst_path), f"Path {dst_path} does not exist."
+        assert "{}" in pattern, f"Pattern {pattern} must contain {{}}."
+        for root, dirs, files in os.walk(dst_path):
+            for file in files:
+                if file.startswith("test_") and file.endswith(".py"):
+                    new_file = pattern.format(file).replace(".py", "") + ".py"
+                    os.rename(
+                        os.path.join(root, file),
+                        os.path.join(root, new_file)
+                    )
