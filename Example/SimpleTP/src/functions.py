@@ -12,3 +12,6 @@ def mul(a, b):
     return a * b
 
 
+def bad_func():
+    return False
+
