@@ -1,7 +1,10 @@
 import logging
 import shutil
+import subprocess
 import sys
 import os
+from typing import Optional
+
 import git
 
 
@@ -34,27 +37,27 @@ class Source:
         self.working_path = kwargs.get("working_path", None)
 
     @property
-    def src_path(self):
+    def src_path(self) -> str:
         return self._src_path
 
     @property
-    def local_path(self):
+    def local_path(self) -> str:
         return self._local_path
 
     @property
-    def remote_path(self):
+    def remote_path(self) -> str:
         return self._remote_path
 
     @property
-    def repo_url(self):
+    def repo_url(self) -> str:
         return self.remote_path
 
     @property
-    def is_local(self):
+    def is_local(self) -> bool:
         return os.path.exists(self.src_path)
 
     @property
-    def is_remote(self):
+    def is_remote(self) -> bool:
         return not self.is_local
 
     def _initialize_local_path(self):
@@ -66,7 +69,7 @@ class Source:
 
     def _initialize_remote_path(self):
         if self.is_remote:
-            if self._src_path.begins_with("http"):
+            if self.src_path.startswith("http"):
                 self._remote_path = self.src_path
             else:
                 self._remote_path = self.DEFAULT_REPO_URL.format(self.src_path)
@@ -81,7 +84,8 @@ class Source:
             else:
                 raise RuntimeError(f"Path {dst_path} already exists. Set overwrite to True to overwrite.")
         if self.is_local:
-            shutil.copytree(self.local_path, dst_path)
+            dst = os.path.join(dst_path, os.path.basename(self.local_path))
+            shutil.copytree(self.local_path, dst, dirs_exist_ok=True)
         else:
             self._clone_repo(dst_path)
             self.repo.git.checkout(self.repo_branch)
@@ -96,10 +100,43 @@ class Source:
         logging.info(f"Cloning repo {self.repo_name} from {self.repo_url} to {dst_path}. Done.")
         return self.repo
 
-    def setup_at(self, dst_path: str = None, overwrite=False):
+    def setup_at(self, dst_path: str = None, overwrite=False) -> str:
         dst_path = dst_path or self.working_path
+        self.working_path = dst_path
         self.copy(dst_path, overwrite=overwrite)
         return dst_path
+
+    def send_cmd_to_process(
+            self,
+            cmd: str,
+            timeout: Optional[int] = None,
+            **kwargs
+    ):
+        fmt_cmd = f"{cmd}" + ('\n' if not cmd.endswith('\n') else '')
+        process = subprocess.Popen(
+            fmt_cmd,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            shell=True,
+            universal_newlines=True,
+            encoding="utf8",
+            errors='ignore',
+            cwd=kwargs.get("cwd", os.path.normpath(self.working_path))
+        )
+        stdout, stderr = process.communicate(timeout=timeout)
+        return stdout
+
+    def __repr__(self):
+        _repr = f"{self.__class__.__name__}(src={self.src_path}"
+        if self.working_path is not None:
+            _repr += f", working_path={self.working_path}"
+        if self.is_local:
+            _repr += ", is_local=True"
+        else:
+            _repr += ", is_remote=True"
+        _repr += ")"
+        return _repr
 
 
 class SourceCode(Source):
@@ -126,21 +163,67 @@ class SourceCode(Source):
     def __init__(self, src_path, *args, **kwargs):
         super().__init__(src_path, *args, **kwargs)
         self.code_root_folder = kwargs.get("code_root_folder", self.DEFAULT_CODE_ROOT_FOLDER)
+        self.venv = kwargs.get("venv", self.DEFAULT_VENV)
+        self.reqs_path = kwargs.get(
+            "requirements_path", os.path.join(os.path.dirname(self.local_path), "requirements.txt")
+        )
 
-    def setup_at(self, dst_path: str = None, overwrite=False):
+    @property
+    def is_venv_created(self):
+        return os.path.exists(self.get_venv_path())
+
+    def setup_at(self, dst_path: str = None, overwrite=True):
         dst_path = super().setup_at(dst_path, overwrite=overwrite)
-        self.maybe_create_venv()
+        venv_stdout = self.maybe_create_venv()
+        reqs_stdout = self.install_requirements()
+        return dst_path
 
-    def maybe_create_venv(self):
-        if os.path.exists(self.venv_path) and self.recreate_venv and not self.venv_recreated_flag:
+    def get_venv_path(self, dst_path: str = None) -> str:
+        dst_path = dst_path or self.working_path
+        return os.path.join(dst_path, self.venv)
+
+    def maybe_create_venv(self, dst_path: str = None):
+        dst_path = dst_path or self.working_path
+        venv_path = self.get_venv_path(dst_path)
+        stdout = ""
+        if os.path.exists(venv_path):
             logging.info(f"Recreating venv {self.venv} ...")
-            shutil.rmtree(self.venv_path)
-            self.venv_recreated_flag = True
-        if not os.path.exists(self.venv_path):
-            logging.info(f"Creating venv at {self.venv_path} ...")
-            stdout = self.send_cmd_to_process(f"python -m venv {self.venv}", activate_venv=False)
+            shutil.rmtree(venv_path)
+        if not os.path.exists(venv_path):
+            logging.info(f"Creating venv at {venv_path} ...")
+            stdout = self.send_cmd_to_process(f"python -m venv {self.venv}", cwd=dst_path)
             logging.info(f"Creating venv -> Done. stdout: {stdout}")
-            self.exec_setup_cmds()
+        return stdout
+
+    def get_venv_scripts_folder(self, dst_path: str = None) -> str:
+        dst_path = dst_path or self.working_path
+        return self.VENV_SCRIPTS_FOLDER_BY_OS[sys.platform].format(self.get_venv_path(dst_path))
+
+    def get_venv_python_path(self, dst_path: str = None) -> str:
+        dst_path = dst_path or self.working_path
+        return os.path.join(
+            self.get_venv_scripts_folder(dst_path),
+            "python"
+        )
+
+    def install_requirements(self):
+        return self.send_cmd_to_process(
+            f"{self.get_venv_python_path()} -m pip install -r {self.reqs_path}",
+            cwd=self.working_path
+        )
+
+    def send_cmd_to_process(
+            self,
+            cmd: str,
+            timeout: Optional[int] = None,
+            **kwargs
+    ):
+        if self.is_venv_created:
+            if cmd.startswith("python"):
+                cmd = cmd.replace("python", self.get_venv_python_path())
+            if cmd.startswith("pip"):
+                cmd = cmd.replace("pip", os.path.join(self.get_venv_scripts_folder(), "pip"))
+        return super().send_cmd_to_process(cmd, timeout=timeout, **kwargs)
 
 
 class SourceTests(Source):
