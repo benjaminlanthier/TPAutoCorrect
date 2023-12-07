@@ -1,21 +1,13 @@
 import json
+import os
 from copy import deepcopy
 from typing import Optional
 
-import pytest
-import pytest_cov
-import pytest_jsonreport
-from pytest_jsonreport.plugin import JSONReport
-from pytest_cov.plugin import CovPlugin
-import os
-import sys
-import shutil
-
 from . import utils
-from .source import Source, SourceCode, SourceTests
-from .report import Report
-from .utils import find_filepath, rm_pycache, rm_pyc_files
 from .perf_test_case import PEP8TestCase
+from .report import Report
+from .source import SourceCode, SourceTests
+from .utils import find_filepath, rm_pycache, rm_pyc_files
 
 
 class Tester:
@@ -80,7 +72,7 @@ class Tester:
             f"--json-report-summary",
             f"--json-report-indent=4",
         ]
-
+    
     def run(self, *args, **kwargs):
         self.weights.update(kwargs.pop("weights", {}))
         save_report = kwargs.pop("save_report", True)
@@ -168,13 +160,13 @@ class Tester:
         percent_passed = 100 * ratio_passed
         percent_failed = 100 * ratio_failed
         return {
-            "passed": passed_tests,
-            "failed": failed_tests,
-            "total": total_tests,
-            "ratio_passed": ratio_passed,
-            "ratio_failed": ratio_failed,
+            "passed"               : passed_tests,
+            "failed"               : failed_tests,
+            "total"                : total_tests,
+            "ratio_passed"         : ratio_passed,
+            "ratio_failed"         : ratio_failed,
             self.PERCENT_PASSED_KEY: percent_passed,
-            "percent_failed": percent_failed,
+            "percent_failed"       : percent_failed,
         }
     
     def get_pep8_score(self):
@@ -187,7 +179,7 @@ class Tester:
     def clear_pycache(self):
         rm_pycache(self.report_dir)
         rm_pyc_files(self.report_dir)
-        
+    
     def clear_pytest_temporary_files(self):
         self.clear_pycache()
         tmp_files = [

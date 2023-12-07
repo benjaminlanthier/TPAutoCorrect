@@ -1,5 +1,5 @@
 import json
-import os
+
 import numpy as np
 
 
@@ -91,10 +91,12 @@ class Report:
     
     def get_normalized(self) -> "Report":
         total_weight = sum([self.get_weight(k) for k in self.keys()])
-        return Report({
-            k: {self.VALUE_KEY: self.get_value(k), self.WEIGHT_KEY: self.get_weight(k) / total_weight}
-            for k in self.keys()
-        })
+        return Report(
+            {
+                k: {self.VALUE_KEY: self.get_value(k), self.WEIGHT_KEY: self.get_weight(k) / total_weight}
+                for k in self.keys()
+            }
+        )
     
     def get_grade(self) -> float:
         if self.is_normalized:

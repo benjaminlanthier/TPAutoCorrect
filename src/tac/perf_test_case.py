@@ -38,4 +38,3 @@ class PEP8TestCase(TestCase):
             err_ratio = result.total_errors / result.counters['physical lines']
         percent_value = np.clip(100.0 - (err_ratio * 100.0), 0.0, 100.0).item()
         return TestResult(self.name, percent_value, message=message)
-

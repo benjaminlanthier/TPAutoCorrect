@@ -1,8 +1,8 @@
 import logging
+import os
 import shutil
 import subprocess
 import sys
-import os
 from typing import Optional
 
 import git
@@ -16,14 +16,14 @@ class Source:
     # Git
     DEFAULT_REPO_URL = "https://github.com/{}.git"
     DEFAULT_REPO_BRANCH = "main"
-
+    
     def __init__(self, src_path: Optional[str] = None, *args, **kwargs):
         self._src_path = src_path
         if self._src_path is None:
             self._src_path = self._try_find_default_src_dir()
         self.args = args
         self.kwargs = kwargs
-
+        
         self._repo_url = kwargs.get("repo_url", kwargs.get("url", None))
         if self.is_remote and self._repo_url is None:
             raise ValueError(
@@ -35,11 +35,11 @@ class Source:
         self.repo_branch = kwargs.get("repo_branch", self.DEFAULT_REPO_BRANCH)
         self.repo = None
         self.local_repo_tmp_dirname = kwargs.get("local_repo_tmp_dirname", "tmp_git")
-
+        
         self.working_dir = kwargs.get("working_dir", None)
         
         self.logging_func = kwargs.get("logging_func", logging.info)
-
+    
     @property
     def src_path(self) -> str:
         r"""
@@ -50,7 +50,7 @@ class Source:
         :rtype: str
         """
         return self._src_path
-
+    
     @property
     def local_path(self) -> Optional[str]:
         r"""
@@ -64,7 +64,7 @@ class Source:
         if self.working_dir is None:
             return None
         return os.path.join(self.working_dir, os.path.basename(self.src_path))
-
+    
     @property
     def repo_url(self) -> str:
         r"""
@@ -82,11 +82,11 @@ class Source:
         :return: The repo name of the object.
         """
         return self.repo_url.split("/")[-1].split(".")[0]
-
+    
     @property
     def is_local(self) -> bool:
         return os.path.exists(self.src_path)
-
+    
     @property
     def is_remote(self) -> bool:
         return not self.is_local
@@ -111,7 +111,7 @@ class Source:
                 f"Please provide a source directory with the 'src_path' argument."
             )
         return dirpath
-
+    
     def copy_to_working_dir(self, overwrite=False):
         if self.is_setup and overwrite:
             utils.try_rmtree(self.local_path, ignore_errors=True)
@@ -140,7 +140,7 @@ class Source:
         src_repo_path = os.path.join(self.local_repo_tmp_dirpath, self.src_path)
         shutil.copytree(src_repo_path, self.local_path, dirs_exist_ok=True)
         return self.repo
-
+    
     def setup_at(self, dst_path: str = None, overwrite=False, **kwargs) -> str:
         dst_path = dst_path or self.working_dir
         self.working_dir = dst_path
@@ -150,7 +150,7 @@ class Source:
         if kwargs.get("debug", False):
             self.logging_func(self)
         return dst_path
-
+    
     def send_cmd_to_process(
             self,
             cmd: str,
@@ -191,7 +191,7 @@ class Source:
     
     def extra_repr(self) -> str:
         return ""
-
+    
     def __repr__(self):
         _repr = f"{self.__class__.__name__}(src={self.src_path}"
         if self.working_dir is not None:
@@ -215,22 +215,22 @@ class SourceCode(Source):
     DEFAULT_OUTPUT_FOLDER = "results"
     DEFAULT_CMDS = "pip install -r requirements.txt && python main.py"
     DEFAULT_CODE_ROOT_FOLDER = "."
-
+    
     # Venv
     DEFAULT_VENV = "venv"
     VENV_SCRIPTS_FOLDER_BY_OS = {
-        "win32": r"{}\Scripts",
-        "linux": "{}/bin",
+        "win32" : r"{}\Scripts",
+        "linux" : "{}/bin",
         "darwin": "{}/bin",
     }
     VENV_ACTIVATE_CMD_BY_OS = {
-        "win32": r"{}\Scripts\activate.bat",
-        "linux": "source {}/bin/activate",
+        "win32" : r"{}\Scripts\activate.bat",
+        "linux" : "source {}/bin/activate",
         "darwin": "source {}/bin/activate",
     }
     DEFAULT_SETUP_CMDS = "pip install -r requirements.txt"
     DEFAULT_RECREATE_VENV = True
-
+    
     def __init__(self, src_path: Optional[str] = None, *args, **kwargs):
         super().__init__(src_path, *args, **kwargs)
         self.code_root_folder = kwargs.get("code_root_folder", self.DEFAULT_CODE_ROOT_FOLDER)
@@ -250,7 +250,7 @@ class SourceCode(Source):
     def find_requirements_path(self) -> Optional[str]:
         local_root = os.path.join(self.src_path, "..")
         return utils.find_filepath("requirements.txt", root=local_root)
-
+    
     def setup_at(self, dst_path: str = None, overwrite=True, **kwargs):
         dst_path = super().setup_at(dst_path, overwrite=overwrite)
         venv_stdout = self.maybe_create_venv()
@@ -259,7 +259,7 @@ class SourceCode(Source):
             self.logging_func(f"venv_stdout: {venv_stdout}")
             self.logging_func(f"reqs_stdout: {reqs_stdout}")
         return dst_path
-
+    
     def maybe_create_venv(self):
         stdout = ""
         if os.path.exists(self.venv_path):
@@ -270,16 +270,16 @@ class SourceCode(Source):
             stdout = self.send_cmd_to_process(f"python -m venv {self.venv}", cwd=self.working_dir)
             self.logging_func(f"Creating venv -> Done. stdout: {stdout}")
         return stdout
-
+    
     def get_venv_scripts_folder(self) -> str:
         return self.VENV_SCRIPTS_FOLDER_BY_OS[sys.platform].format(self.venv_path)
-
+    
     def get_venv_python_path(self) -> str:
         return os.path.join(
             self.get_venv_scripts_folder(),
             "python"
         )
-
+    
     def install_requirements(self):
         if self.reqs_path is None:
             return "No requirements.txt file found."
@@ -287,7 +287,7 @@ class SourceCode(Source):
             f"{self.get_venv_python_path()} -m pip install -r {self.reqs_path}",
             cwd=self.working_dir
         )
-
+    
     def send_cmd_to_process(
             self,
             cmd: str,
@@ -308,7 +308,7 @@ class SourceCode(Source):
     def clear_temporary_files(self):
         super().clear_temporary_files()
         self.clear_venv()
-        
+    
     def extra_repr(self) -> str:
         return f", venv={self.venv_path}, reqs={self.reqs_path}"
 
@@ -318,7 +318,7 @@ class SourceTests(Source):
     
     def __init__(self, src_path: Optional[str] = None, *args, **kwargs):
         super().__init__(src_path, *args, **kwargs)
-
+    
     def setup_at(self, dst_path: str = None, overwrite=True, **kwargs):
         dst_path = super().setup_at(dst_path, overwrite=overwrite)
         return dst_path

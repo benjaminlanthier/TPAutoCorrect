@@ -67,7 +67,7 @@ def rm_pycache(root: Optional[str] = None):
         for dir in dirs:
             if dir == "__pycache__":
                 try_rmtree(os.path.join(root, dir))
-                
+
 
 def rm_pyc_files(root: Optional[str] = None):
     root = root or os.getcwd()
