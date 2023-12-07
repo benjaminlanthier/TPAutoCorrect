@@ -1,10 +1,10 @@
 import sys
 import os
 try:
-    import tp_auto_correct as tac
+    import tac
 except ImportError:
     sys.path.append(os.path.join(os.path.dirname(__file__), "..", "..", "src"))
-    import tp_auto_correct as tac
+    import tac
 
 
 def auto_correct_default():
@@ -31,7 +31,7 @@ def auto_correct():
 
 def auto_correct_from_git():
     path_to_example = os.path.join(".", "Example", "SimpleTP")
-    repo_url = "https://github.com/JeremieGince/TPAutoCorrect.git"
+    repo_url = tac.__url__
     code_source = tac.SourceCode(os.path.join(path_to_example, "src"), url=repo_url, logging_func=print)
     print(code_source)
     tests_source = tac.SourceTests(os.path.join(path_to_example, "tests"), url=repo_url, logging_func=print)

@@ -6,10 +6,8 @@ import os
 from typing import Optional
 
 import git
-from github import Github
-from github import Auth
 
-from src.tp_auto_correct import utils
+from . import utils
 
 
 class Source:
@@ -34,8 +32,6 @@ class Source:
                 f"'url' or 'repo_url' keyword argument."
             )
         
-        # self.auth = Auth.Token("access_token")
-        # self.github = Github(auth=self.auth)
         self.repo_branch = kwargs.get("repo_branch", self.DEFAULT_REPO_BRANCH)
         self.repo = None
         self.local_repo_tmp_dirname = kwargs.get("local_repo_tmp_dirname", "tmp_git")
