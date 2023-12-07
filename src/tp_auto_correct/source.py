@@ -24,7 +24,6 @@ class Source:
         self.kwargs = kwargs
 
         self._local_path = None
-        self._remote_path = None
         self._repo_url = kwargs.get("repo_url", kwargs.get("url", None))
         
         # self.auth = Auth.Token("access_token")
@@ -58,22 +57,13 @@ class Source:
         return self._local_path
 
     @property
-    def remote_path(self) -> Optional[str]:
-        r"""
-        Return the remote path of the object or in other words the repo url if the source is remote.
-        
-        :return: The remote path of the object.
-        """
-        return self._remote_path
-
-    @property
     def repo_url(self) -> str:
         r"""
-        Return the remote path of the object or in other words the repo url if the source is remote.
+        Return the remote url of the object or in other words the repo url if the source is remote.
 
-        :return: The remote path of the object.
+        :return: The remote url of the object.
         """
-        return self.remote_path
+        return self._repo_url
 
     @property
     def is_local(self) -> bool:
@@ -151,6 +141,7 @@ class Source:
             _repr += ", is_local=True"
         else:
             _repr += ", is_remote=True"
+            _repr += f", url={self.repo_url}"
         _repr += ")"
         return _repr
 
