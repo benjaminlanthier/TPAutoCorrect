@@ -5,3 +5,4 @@ pytest_json_report==1.5.0
 pythonbasictools==0.0.1a10
 PyGithub~=2.1.1
 numpy==1.26.2
+pycodestyle==2.11.1

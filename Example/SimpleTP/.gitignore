@@ -296,5 +296,5 @@ user/
 tests/tmp
 .report.json
 temp
-report_dir
+report_dir*
 *.json
