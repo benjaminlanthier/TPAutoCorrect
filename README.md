@@ -15,7 +15,7 @@
 
 | Method     | Commands                                                                                                                                                                            |
 |------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| **PyPi**   | `pip install msim`                                                                                                                                                                  |
+| **PyPi**   | `pip install tac`                                                                                                                                                                   |
 | **source** | `pip install git+https://github.com/JeremieGince/TPAutoCorrect`                                                                                                                     |
 | **wheel**  | 1.Download the .whl file [here](https://github.com/JeremieGince/TPAutoCorrect/tree/main/dist);<br> 2. Copy the path of this file on your computer; <br> 3. `pip install [path].whl` |
 
@@ -45,7 +45,7 @@ and following the instructions above.
 
 # Citation
 ```
-@misc{Gince2023,
+@misc{tac_Gince2023,
   title={TAC: TP Auto Correct},
   author={Jérémie Gince},
   year={2023},
