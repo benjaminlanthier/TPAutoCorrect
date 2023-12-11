@@ -25,7 +25,7 @@ def auto_correct():
         master_tests_src=master_tests_source,
         report_dir="report_dir",
     )
-    auto_corrector.run(overwrite=False, debug=True)
+    auto_corrector.run(overwrite=False, debug=True, clear_pytest_temporary_files=False)
     print(auto_corrector.report)
 
 
@@ -50,7 +50,7 @@ def auto_correct_from_git():
 
 
 if __name__ == "__main__":
-    auto_correct_default()
-    auto_correct()
+    # auto_correct_default()
+    # auto_correct()
     auto_correct_from_git()
 
