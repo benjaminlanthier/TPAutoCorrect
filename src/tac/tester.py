@@ -7,7 +7,7 @@ from . import utils
 from .perf_test_case import PEP8TestCase
 from .report import Report
 from .source import SourceCode, SourceTests
-from .utils import find_filepath, rm_pycache, rm_pyc_files
+from .utils import find_filepath, rm_pycache, rm_pyc_files, rm_pytest_cache
 
 
 class Tester:
@@ -178,6 +178,7 @@ class Tester:
     
     def clear_pycache(self):
         rm_pycache(self.report_dir)
+        rm_pytest_cache(self.report_dir)
         rm_pyc_files(self.report_dir)
     
     def clear_pytest_temporary_files(self):
