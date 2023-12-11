@@ -1,6 +1,6 @@
 import os
 import shutil
-from typing import Optional
+from typing import Optional, Union, List
 
 
 def find_filepath(filename: str, root: Optional[str] = None) -> Optional[str]:
@@ -61,17 +61,50 @@ def try_rmtree(path: str, ignore_errors: bool = True):
         pass
 
 
-def rm_pycache(root: Optional[str] = None):
+def try_rm_trees(paths: Union[str, List[str]], ignore_errors: bool = True):
+    if isinstance(paths, str):
+        paths = [paths]
+    for path in paths:
+        try_rmtree(path, ignore_errors=ignore_errors)
+
+
+def rm_direnames_from_root(dirnames: Union[str, List[str]], root: Optional[str] = None):
+    if isinstance(dirnames, str):
+        dirnames = [dirnames]
     root = root or os.getcwd()
     for root, dirs, files in os.walk(root):
         for dir in dirs:
-            if dir == "__pycache__":
+            if dir in dirnames:
                 try_rmtree(os.path.join(root, dir))
+    return True
 
 
-def rm_pyc_files(root: Optional[str] = None):
+def rm_filetypes_from_root(filetypes: Union[str, List[str]], root: Optional[str] = None):
+    if isinstance(filetypes, str):
+        filetypes = [filetypes]
     root = root or os.getcwd()
     for root, dirs, files in os.walk(root):
         for file in files:
-            if file.endswith(".pyc"):
+            if any([file.endswith(filetype) for filetype in filetypes]):
                 try_rmtree(os.path.join(root, file))
+    return True
+
+
+def rm_pycache(root: Optional[str] = None):
+    return rm_direnames_from_root("__pycache__", root=root)
+
+
+def rm_pyc_files(root: Optional[str] = None):
+    return rm_filetypes_from_root(".pyc", root=root)
+
+
+def rm_pyo_files(root: Optional[str] = None):
+    return rm_filetypes_from_root(".pyo", root=root)
+
+
+def rm_pytest_cache(root: Optional[str] = None):
+    return rm_direnames_from_root(".pytest_cache", root=root)
+
+
+
+
