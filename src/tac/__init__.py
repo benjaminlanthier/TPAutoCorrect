@@ -11,6 +11,7 @@ from .source import (
 )
 from .tester import Tester
 from .report import Report
+from . import utils as tac_utils
 
 import warnings
 
