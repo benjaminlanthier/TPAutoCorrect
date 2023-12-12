@@ -23,6 +23,7 @@ class Tester:
     }
     MASTER_TESTS_RENAME_PATTERN = "{}_master.py"
     DOT_JSON_REPORT_NAME = ".report.json"
+    DEFAULT_PASSED_RATIO_ZERO_TESTS = 0.0
     
     def __init__(
             self,
@@ -139,10 +140,14 @@ class Tester:
         :return: code coverage
         :rtype: float
         """
-        coverage_file = self.coverage_json_path
+        coverage_file = utils.reindent_json_file(self.coverage_json_path)
         coverage_data = json.load(open(coverage_file))
         json.dump(coverage_data, open(coverage_file, "w"), indent=4)
-        summaries = [d["summary"] for f, d in coverage_data["files"].items() if f.endswith(".py")]
+        summaries = [
+            d["summary"]
+            for f, d in coverage_data["files"].items()
+            if f.endswith(".py") and utils.is_subpath_in_path(self.code_src.local_path, f)
+        ]
         mean_percent_covered = sum([s["percent_covered"] for s in summaries]) / len(summaries)
         return mean_percent_covered
     
@@ -155,8 +160,8 @@ class Tester:
             ratio_passed = passed_tests / total_tests
             ratio_failed = failed_tests / total_tests
         else:
-            ratio_passed = 1.0
-            ratio_failed = 1.0
+            ratio_passed = self.DEFAULT_PASSED_RATIO_ZERO_TESTS
+            ratio_failed = 1.0 - self.DEFAULT_PASSED_RATIO_ZERO_TESTS
         percent_passed = 100 * ratio_passed
         percent_failed = 100 * ratio_failed
         return {
