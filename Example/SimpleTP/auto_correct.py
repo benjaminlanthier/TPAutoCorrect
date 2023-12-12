@@ -18,7 +18,9 @@ def auto_correct():
     print(code_source)
     tests_source = tac.SourceTests(logging_func=print)
     print(tests_source)
-    master_tests_source = tac.SourceTests(os.path.join(os.path.dirname(__file__), "master_tests"), logging_func=print)
+    master_tests_source = tac.SourceMasterTests(
+        os.path.join(os.path.dirname(__file__), "master_tests"), logging_func=print
+    )
     print(master_tests_source)
     auto_corrector = tac.Tester(
         code_source, tests_source,
@@ -36,7 +38,7 @@ def auto_correct_from_git():
     print(code_source)
     tests_source = tac.SourceTests(os.path.join(path_to_example, "tests"), url=repo_url, logging_func=print)
     print(tests_source)
-    master_tests_source = tac.SourceTests(
+    master_tests_source = tac.SourceMasterTests(
         os.path.join(path_to_example, "master_tests"), url=repo_url, logging_func=print
     )
     print(master_tests_source)
