@@ -1,5 +1,7 @@
 import json
+import logging
 import os
+import shutil
 from copy import deepcopy
 from typing import Optional
 
@@ -22,15 +24,19 @@ class Tester:
         PEP8_KEY                 : 1.0,
     }
     MASTER_TESTS_RENAME_PATTERN = "{}_master.py"
-    DOT_JSON_REPORT_NAME = ".report.json"
+    DOT_JSON_REPORT_NAME = ".tmp_report.json"
+    MASTER_DOT_JSON_REPORT_NAME = ".tmp_master_report.json"
+    DEFAULT_REPORT_FILENAME = "report.json"
     DEFAULT_PASSED_RATIO_ZERO_TESTS = 0.0
+    DEFAULT_LOGGING_FUNC = logging.info
     
     def __init__(
             self,
             code_src: Optional[SourceCode] = None,
             tests_src: Optional[SourceTests] = None,
-            master_tests_src: SourceTests = None,
-            *args,
+            *,
+            master_code_src: Optional[SourceCode] = None,
+            master_tests_src: Optional[SourceTests] = None,
             **kwargs
     ):
         if code_src is None:
@@ -39,55 +45,109 @@ class Tester:
             tests_src = SourceTests()
         self.code_src = code_src
         self.tests_src = tests_src
+        self.master_code_src = master_code_src
         self.master_tests_src = master_tests_src
-        self.args = args
         self.kwargs = kwargs
+        self.logging_func = kwargs.get("logging_func", self.DEFAULT_LOGGING_FUNC)
         
         self.test_cases_summary = None
         self.master_test_cases_summary = None
         self.report_dir = self.kwargs.get("report_dir", os.path.join(os.getcwd(), "report_dir"))
-        self.report_filepath = self.kwargs.get("report_filepath", os.path.join(self.report_dir, "report.json"))
+        self.report_filepath = self.kwargs.get(
+            "report_filepath", os.path.join(self.report_dir, self.DEFAULT_REPORT_FILENAME)
+        )
         self.report = Report(report_filepath=self.report_filepath)
         self.weights = self.kwargs.get("weights", self.DEFAULT_WEIGHTS)
     
     @property
     def dot_coverage_path(self):
-        return find_filepath(".coverage")
+        return self._find_temp_filepath(".coverage")
     
     @property
     def coverage_json_path(self):
-        return find_filepath("coverage.json")
+        return self._find_temp_filepath("coverage.json")
     
     @property
     def coverage_xml_path(self):
-        return find_filepath("coverage.xml")
+        return self._find_temp_filepath("coverage.xml")
     
     @property
     def dot_report_json_path(self):
-        return find_filepath(self.DOT_JSON_REPORT_NAME)
+        return self._find_temp_filepath(self.DOT_JSON_REPORT_NAME)
     
     @property
-    def pytest_plugins_options(self):
-        return [
-            f"--cov={self.code_src.local_path}",
-            "--cov-report=json",
-            "-p no:cacheprovider",
-            "--json-report",
-            f"--json-report-file={self.DOT_JSON_REPORT_NAME}",
-            f"--json-report-summary",
-            f"--json-report-indent=4",
+    def master_dot_report_json_path(self):
+        return self._find_temp_filepath(self.MASTER_DOT_JSON_REPORT_NAME)
+    
+    @property
+    def temp_files(self):
+        tmp_files = [
+            self.dot_coverage_path,
+            self.coverage_json_path,
+            self.coverage_xml_path,
+            self.dot_report_json_path,
+            self.master_dot_report_json_path,
         ]
+        return [f for f in tmp_files if f is not None]
+    
+    def get_pytest_plugins_options(
+            self,
+            add_cov: bool = True,
+            add_json_report: bool = True,
+            json_report_file: Optional[str] = None,
+            **kwargs
+    ):
+        options = []
+        if add_cov:
+            options += [
+                f"--cov={self.code_src.local_path}",
+                "--cov-report=json",
+                "-p no:cacheprovider",
+            ]
+        if add_json_report:
+            json_report_file = json_report_file or self.DOT_JSON_REPORT_NAME
+            options += [
+                "--json-report",
+                f"--json-report-file={json_report_file}",
+                f"--json-report-summary",
+                f"--json-report-indent=4",
+            ]
+        return options
+    
+    @property
+    def all_sources(self):
+        sources = [self.code_src, self.tests_src, self.master_code_src, self.master_tests_src]
+        return [s for s in sources if s is not None]
+    
+    @property
+    def is_setup(self):
+        return all([s.is_setup for s in self.all_sources])
+    
+    def _find_temp_filepath(self, filename: str):
+        roots = [self.report_dir, os.getcwd()]
+        found_files = [find_filepath(filename, root=root) for root in roots]
+        found_files = [f for f in found_files if f is not None] + [None]
+        return found_files[0]
+    
+    def setup_at(self, **kwargs):
+        force = kwargs.pop("force_setup", False)
+        if self.is_setup and (not force):
+            return self
+        self.code_src.setup_at(self.report_dir, **kwargs)
+        self.tests_src.setup_at(self.report_dir, **kwargs)
+        if self.master_code_src is not None:
+            self.master_code_src.setup_at(self.report_dir, **kwargs)
+        if self.master_tests_src is not None:
+            self.master_tests_src.setup_at(self.report_dir, **kwargs)
+        return self
     
     def run(self, *args, **kwargs):
         self.weights.update(kwargs.pop("weights", {}))
         save_report = kwargs.pop("save_report", True)
         clear_pytest_temporary_files = kwargs.pop("clear_pytest_temporary_files", True)
         clear_temporary_files = kwargs.pop("clear_temporary_files", False)
-        self.code_src.setup_at(self.report_dir, **kwargs)
-        self.tests_src.setup_at(self.report_dir, **kwargs)
-        if self.master_tests_src is not None:
-            self.master_tests_src.setup_at(self.report_dir, **kwargs)
-        self._run()
+        self.setup_at(**kwargs)
+        self._run(**kwargs)
         if save_report:
             self.report.save(self.report_filepath)
         if clear_pytest_temporary_files:
@@ -95,15 +155,15 @@ class Tester:
         if clear_temporary_files:
             self.clear_temporary_files()
     
-    def _run(self):
+    def _run(self, **kwargs):
         self.clear_pycache()
-        self._run_pytest()
+        self._run_pytest(**kwargs)
         self.report.add(
             self.CODE_COVERAGE_KEY,
             self.get_code_coverage(),
             weight=self.weights[self.CODE_COVERAGE_KEY],
         )
-        self.test_cases_summary = deepcopy(self.get_test_cases_summary())
+        self.test_cases_summary = deepcopy(self.get_test_cases_summary(self.dot_report_json_path))
         self.report.add(
             self.PERCENT_PASSED_KEY,
             self.test_cases_summary[self.PERCENT_PASSED_KEY],
@@ -117,8 +177,8 @@ class Tester:
         
         if self.master_tests_src is not None:
             self.master_tests_src.rename_test_files(pattern=self.MASTER_TESTS_RENAME_PATTERN)
-            self._run_master_pytest()
-            self.master_test_cases_summary = deepcopy(self.get_test_cases_summary())
+            self._run_master_pytest(**kwargs)
+            self.master_test_cases_summary = deepcopy(self.get_test_cases_summary(self.master_dot_report_json_path))
             self.report.add(
                 self.MASTER_PERCENT_PASSED_KEY,
                 self.master_test_cases_summary[self.PERCENT_PASSED_KEY],
@@ -127,15 +187,29 @@ class Tester:
         
         self.clear_pycache()
     
-    def _run_pytest(self):
-        os.system(f"pytest {self.tests_src.local_path} {' '.join(self.pytest_plugins_options)}")
+    def _run_pytest(self, **kwargs):
+        options = self.get_pytest_plugins_options(
+            add_cov=True, add_json_report=True, json_report_file=self.DOT_JSON_REPORT_NAME, **kwargs
+        )
+        cmd = f"pytest {self.tests_src.local_path} {' '.join(options)}"
+        if kwargs.get("debug", False):
+            self.logging_func(f"os.system: {cmd}")
+        os.system(cmd)
         self.clear_pycache()
+        self.move_temp_files_to_report_dir(**kwargs)
     
-    def _run_master_pytest(self):
+    def _run_master_pytest(self, **kwargs):
         if self.master_tests_src is None:
             return
-        os.system(f"pytest {self.master_tests_src.local_path} {' '.join(self.pytest_plugins_options)}")
+        options = self.get_pytest_plugins_options(
+            add_cov=False, add_json_report=True, json_report_file=self.MASTER_DOT_JSON_REPORT_NAME, **kwargs
+        )
+        cmd = f"pytest {self.master_tests_src.local_path} {' '.join(options)}"
+        if kwargs.get("debug", False):
+            self.logging_func(f"os.system: {cmd}")
+        os.system(cmd)
         self.clear_pycache()
+        self.move_temp_files_to_report_dir(**kwargs)
     
     def get_code_coverage(self) -> float:
         r"""
@@ -146,7 +220,6 @@ class Tester:
         """
         coverage_file = utils.reindent_json_file(self.coverage_json_path)
         coverage_data = json.load(open(coverage_file))
-        json.dump(coverage_data, open(coverage_file, "w"), indent=4)
         summaries = [
             d["summary"]
             for f, d in coverage_data["files"].items()
@@ -155,8 +228,9 @@ class Tester:
         mean_percent_covered = sum([s["percent_covered"] for s in summaries]) / len(summaries)
         return mean_percent_covered
     
-    def get_test_cases_summary(self):
-        json_plugin_report_data = json.load(open(self.dot_report_json_path))
+    def get_test_cases_summary(self, dot_report_json_path: Optional[str] = None):
+        dot_report_json_path = dot_report_json_path or self.dot_report_json_path
+        json_plugin_report_data = json.load(open(dot_report_json_path))
         passed_tests = json_plugin_report_data["summary"].get("passed", 0)
         failed_tests = json_plugin_report_data["summary"].get("failed", 0)
         total_tests = json_plugin_report_data["summary"]["total"]
@@ -185,6 +259,15 @@ class Tester:
         tests_test_case_result = tests_test_case.run()
         return (src_test_case_result.percent_value + tests_test_case_result.percent_value) / 2.0
     
+    def move_temp_files_to_report_dir(self, **kwargs):
+        for f in self.temp_files:
+            try:
+                shutil.move(f, self.report_dir)
+            except shutil.Error as e:
+                if kwargs.get("debug", False):
+                    self.logging_func(f"shutil.move({f},{self.report_dir}) -> raises: {e}")
+        return self
+    
     def clear_pycache(self):
         rm_pycache(self.report_dir)
         rm_pytest_cache(self.report_dir)
@@ -192,18 +275,10 @@ class Tester:
     
     def clear_pytest_temporary_files(self):
         self.clear_pycache()
-        tmp_files = [
-            self.dot_coverage_path,
-            self.coverage_json_path,
-            self.coverage_xml_path,
-            self.dot_report_json_path,
-        ]
-        for f in tmp_files:
+        for f in self.temp_files:
             utils.rm_file(f)
     
     def clear_temporary_files(self):
         self.clear_pytest_temporary_files()
-        sources = [self.code_src, self.tests_src, self.master_tests_src]
-        for src in sources:
-            if src is not None:
-                src.clear_temporary_files()
+        for src in self.all_sources:
+            src.clear_temporary_files()
