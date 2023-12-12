@@ -10,6 +10,7 @@ from . import utils
 
 class Source:
     DEFAULT_SRC_DIRNAME = "src"
+    DEFAULT_LOGGING_FUNC = logging.info
     
     # Git
     DEFAULT_REPO_URL = "https://github.com/{}.git"
@@ -35,8 +36,9 @@ class Source:
         self.local_repo_tmp_dirname = kwargs.get("local_repo_tmp_dirname", "tmp_git")
         
         self.working_dir = kwargs.get("working_dir", None)
+        self.working_dirname = kwargs.get("working_dirname", None)
         
-        self.logging_func = kwargs.get("logging_func", logging.info)
+        self.logging_func = kwargs.get("logging_func", self.DEFAULT_LOGGING_FUNC)
     
     @property
     def src_path(self) -> str:
@@ -61,7 +63,8 @@ class Source:
         """
         if self.working_dir is None:
             return None
-        return os.path.join(self.working_dir, os.path.basename(self.src_path))
+        basename = self.working_dirname or os.path.basename(self.src_path)
+        return os.path.join(self.working_dir, basename)
     
     @property
     def repo_url(self) -> Optional[str]:
@@ -219,8 +222,6 @@ class Source:
 
 class SourceCode(Source):
     # Code
-    DEFAULT_OUTPUT_FOLDER = "results"
-    DEFAULT_CMDS = "pip install -r requirements.txt && python main.py"
     DEFAULT_CODE_ROOT_FOLDER = "."
     
     # Venv
@@ -341,3 +342,20 @@ class SourceTests(Source):
                         os.path.join(root, file),
                         os.path.join(root, new_file)
                     )
+                    
+
+class SourceMasterCode(SourceCode):
+    DEFAULT_VENV = "master_venv"
+    DEFAULT_WORKING_DIRNAME = "master_src"
+    
+    def __init__(self, src_path: Optional[str] = None, *args, **kwargs):
+        kwargs.setdefault("working_dirname", self.DEFAULT_WORKING_DIRNAME)
+        super().__init__(src_path, *args, **kwargs)
+
+
+class SourceMasterTests(SourceTests):
+    DEFAULT_WORKING_DIRNAME = "master_tests"
+    
+    def __init__(self, src_path: Optional[str] = None, *args, **kwargs):
+        kwargs.setdefault("working_dirname", self.DEFAULT_WORKING_DIRNAME)
+        super().__init__(src_path, *args, **kwargs)
