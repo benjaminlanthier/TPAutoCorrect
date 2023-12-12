@@ -5,8 +5,6 @@ import subprocess
 import sys
 from typing import Optional
 
-import git
-
 from . import utils
 
 
@@ -66,30 +64,34 @@ class Source:
         return os.path.join(self.working_dir, os.path.basename(self.src_path))
     
     @property
-    def repo_url(self) -> str:
+    def repo_url(self) -> Optional[str]:
         r"""
         Return the remote url of the object or in other words the repo url if the source is remote.
 
         :return: The remote url of the object.
+        :rtype: Optional[str]
         """
         return self._repo_url
     
     @property
-    def repo_name(self) -> str:
+    def repo_name(self) -> Optional[str]:
         r"""
         Return the repo name of the object. This is the name of the repo if the source is remote.
         
         :return: The repo name of the object.
+        :rtype: Optional[str]
         """
+        if self.repo_url is None:
+            return None
         return self.repo_url.split("/")[-1].split(".")[0]
     
     @property
     def is_local(self) -> bool:
-        return os.path.exists(self.src_path)
+        return os.path.exists(self.src_path) and (not self.is_remote)
     
     @property
     def is_remote(self) -> bool:
-        return not self.is_local
+        return self.repo_url is not None
     
     @property
     def is_setup(self) -> bool:
@@ -121,6 +123,7 @@ class Source:
             shutil.copytree(self.src_path, self.local_path, dirs_exist_ok=True)
     
     def _clone_repo(self):
+        import git
         if os.path.exists(self.local_repo_tmp_dirpath):
             self.logging_func(
                 f"No need to clone repo {self.repo_name} from {self.repo_url} to {self.local_repo_tmp_dirpath}."
@@ -206,8 +209,12 @@ class Source:
         return _repr
     
     def __del__(self):
-        if self.repo is not None:
-            self.repo.close()
+        try:
+            repo = getattr(self, "repo", None)
+            if repo is not None:
+                repo.close()
+        except:
+            pass
 
 
 class SourceCode(Source):

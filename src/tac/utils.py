@@ -2,6 +2,8 @@ import os
 import sys
 import shutil
 from typing import Optional, Union, List
+from importlib import util as importlib_util
+from contextlib import contextmanager
 
 
 def find_filepath(filename: str, root: Optional[str] = None) -> Optional[str]:
@@ -138,28 +140,106 @@ def is_subpath_in_path(subpath: str, path: str) -> bool:
     return subpath in path
 
 
+@contextmanager
+def add_to_path(p):
+    import sys
+    old_path = sys.path
+    old_modules = sys.modules
+    sys.modules = old_modules.copy()
+    sys.path = sys.path[:]
+    sys.path.insert(0, p)
+    try:
+        yield
+    finally:
+        sys.path = old_path
+        sys.modules = old_modules
+
+
+class PathImport:
+    def __init__(self, filepath: str):
+        self.filepath = os.path.abspath(os.path.normpath(filepath))
+        self._module = None
+        self._spec = None
+        self.added_sys_modules = []
+        
+    @property
+    def module_name(self):
+        return self.get_module_name(self.filepath)
+    
+    @property
+    def module(self):
+        if self._module is None:
+            self._module, self._spec = self.path_import()
+        return self._module
+    
+    @property
+    def spec(self):
+        if self._spec is None:
+            self._module, self._spec = self.path_import()
+        return self._spec
+    
+    def add_sys_module(self, module_name: str, module):
+        self.added_sys_modules.append(module_name)
+        sys.modules[module_name] = module
+        return self
+    
+    def remove_sys_module(self, module_name: str):
+        if module_name in self.added_sys_modules:
+            self.added_sys_modules.remove(module_name)
+        if module_name in sys.modules:
+            sys.modules.pop(module_name)
+        return self
+    
+    def clear_sys_modules(self):
+        for module_name in self.added_sys_modules:
+            if module_name in sys.modules:
+                sys.modules.pop(module_name)
+        self.added_sys_modules = []
+        return self
+
+    def add_sibling_modules(self, sibling_dirname: Optional[str] = None):
+        sibling_dirname = sibling_dirname or os.path.dirname(self.filepath)
+        skip_pyfiles = [os.path.basename(self.filepath), '__init__.py', '__main__.py']
+        for current, subdir, files in os.walk(sibling_dirname):
+            for file_py in files:
+                python_file = os.path.join(current, file_py)
+                if (not file_py.endswith('.py')) or (file_py in skip_pyfiles):
+                    continue
+                (module, spec) = self.path_import(python_file)
+                self.add_sys_module(spec.name, module)
+        return self
+    
+    def get_module_name(self, filepath: Optional[str] = None):
+        filepath = filepath or self.filepath
+        filename = os.path.basename(filepath)
+        module_name = filename.rsplit(".", 1)[0]
+        return module_name
+
+    def path_import(self, absolute_path: Optional[str] = None):
+        absolute_path = absolute_path or self.filepath
+        spec = importlib_util.spec_from_file_location(self.get_module_name(absolute_path), absolute_path)
+        module = importlib_util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        self._module, self._spec = module, spec
+        return module, spec
+    
+    def __repr__(self):
+        return f"{self.__class__.__name__}(filepath={self.filepath})"
+
+
+def get_module_from_file(filepath: str):
+    path_import = PathImport(filepath)
+    try:
+        module, spec = path_import.path_import()
+    except (ImportError, ModuleNotFoundError) as err:
+        path_import.add_sibling_modules()
+        module, spec = path_import.path_import()
+    return module
+
+
 def import_obj_from_file(obj_name: str, filepath: str):
-    from importlib import util as importlib_util
-
-    spec = importlib_util.spec_from_file_location("module.name", filepath)
-    foo = importlib_util.module_from_spec(spec)
-    len_root = len(filepath.split(os.path.sep))
-    import_root = os.path.dirname(filepath)
-    for _ in range(len_root):
-        try:
-            spec.loader.exec_module(foo)
-        except (ImportError, ModuleNotFoundError):
-            sys.path.append(os.path.dirname(import_root))
-        else:
-            break
-        import_root = os.path.dirname(import_root)
-    obj = getattr(foo, obj_name)
-
-    # filepath = os.path.normpath(filepath)
-    # relative_path = os.path.relpath(filepath, os.getcwd())
-    # module_name_ext = relative_path.replace(os.path.sep, ".")
-    # module_name = module_name_ext.rsplit(".", 1)[0]
-    # obj = getattr(importlib.import_module(module_name), obj_name)
+    module = get_module_from_file(filepath)
+    obj = getattr(module, obj_name)
     return obj
 
 

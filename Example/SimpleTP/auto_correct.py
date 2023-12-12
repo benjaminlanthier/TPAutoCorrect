@@ -50,10 +50,6 @@ def auto_correct_from_git():
 
 
 if __name__ == "__main__":
-    AClass = tac.utils.import_obj_from_file(
-        "AClass",
-        tac.utils.find_filepath("a_class.py", root=os.path.join(os.path.dirname(__file__), "src"))
-    )
     auto_correct_default()
     auto_correct()
     auto_correct_from_git()

@@ -27,12 +27,16 @@ class Tester:
     
     def __init__(
             self,
-            code_src: Optional[SourceCode] = SourceCode(),
-            tests_src: Optional[SourceTests] = SourceTests(),
+            code_src: Optional[SourceCode] = None,
+            tests_src: Optional[SourceTests] = None,
             master_tests_src: SourceTests = None,
             *args,
             **kwargs
     ):
+        if code_src is None:
+            code_src = SourceCode()
+        if tests_src is None:
+            tests_src = SourceTests()
         self.code_src = code_src
         self.tests_src = tests_src
         self.master_tests_src = master_tests_src

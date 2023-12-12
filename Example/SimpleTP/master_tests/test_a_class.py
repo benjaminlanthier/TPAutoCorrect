@@ -1,12 +1,22 @@
 import sys
 import os
 import pytest
+try:
+    import tac
+except ImportError:
+    sys.path.append(os.path.join(os.path.dirname(__file__), "..", "..", "src"))
+    import tac
 
 try:
     from ..src.a_class import AClass
 except ImportError:
-    sys.path.append(os.path.join(os.path.dirname(__file__), "..", "src"))
-    from a_class import AClass
+    AClass = tac.utils.import_obj_from_file(
+        "AClass",
+        tac.utils.find_filepath(
+            "a_class.py",
+            root=os.path.join(os.path.dirname(__file__), "..", "src")
+        )
+    )
 
 
 @pytest.mark.parametrize(
