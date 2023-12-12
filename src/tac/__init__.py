@@ -8,6 +8,9 @@ __version__ = "0.0.1-beta0"
 from .source import (
     SourceCode,
     SourceTests,
+    Source,
+    SourceMasterCode,
+    SourceMasterTests,
 )
 from .tester import Tester
 from .report import Report
