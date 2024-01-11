@@ -71,6 +71,13 @@ def parse_args():
             default=default_weight,
             help=f"Weight of the {key} test in the final score.",
         )
+    parser.add_argument(
+        "--rm-report-dir",
+        action="store_true",
+        help="Remove the report directory. "
+             "This option is useful when the report file is pushed to a git repository"
+             " and the report directory is no longer needed.",
+    )
     return parser.parse_args()
 
 
@@ -107,6 +114,8 @@ def main():
     )
     if args.push_report_to is not None:
         tester.push_report_to(args.push_report_to)
+    if args.rm_report_dir:
+        tester.rm_report_dir()
 
 
 if __name__ == '__main__':
