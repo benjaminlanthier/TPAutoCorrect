@@ -297,12 +297,13 @@ class Tester:
             push_report_to = self.kwargs.get("push_report_to", push_report_to)
         if push_report_to is None or push_report_to == "auto":
             self.logging_func(f"trying to detect git repo url from {self.code_src.working_dir}")
-            push_report_to = utils.get_git_repo_url(self.code_src.working_dir)
+            push_report_to = utils.get_git_repo_url(self.code_src.working_dir, )
         if push_report_to is None:
             warnings.warn(
                 f"Could not detect git repo url from {push_report_to=} nor {self.code_src.working_dir}",
                 RuntimeWarning
             )
             return self
+        kwargs.setdefault("local_tmp_path", os.path.join(self.report_dir, "tmp_repo"))
         utils.push_file_to_git_repo(self.report_filepath, push_report_to, **kwargs)
         return self
