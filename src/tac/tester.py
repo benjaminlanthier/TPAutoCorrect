@@ -307,3 +307,13 @@ class Tester:
         kwargs.setdefault("local_tmp_path", os.path.join(self.report_dir, "tmp_repo"))
         utils.push_file_to_git_repo(self.report_filepath, push_report_to, **kwargs)
         return self
+
+    def rm_report_dir(self):
+        rmtree_func = shutil.rmtree
+        try:
+            from git import rmtree as git_rmtree
+            rmtree_func = git_rmtree
+        except ImportError:
+            pass
+        rmtree_func(self.report_dir)
+        return self
