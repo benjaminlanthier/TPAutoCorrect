@@ -295,3 +295,4 @@ pip-selfcheck.json
 user/
 tests/tmp
 .report.json
+report_dir

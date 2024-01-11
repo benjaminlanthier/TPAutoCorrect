@@ -2,6 +2,7 @@ import json
 import logging
 import os
 import shutil
+import warnings
 from copy import deepcopy
 from typing import Optional
 
@@ -52,7 +53,9 @@ class Tester:
         
         self.test_cases_summary = None
         self.master_test_cases_summary = None
-        self.report_dir = self.kwargs.get("report_dir", os.path.join(os.getcwd(), "report_dir"))
+        self.report_dir = self.kwargs.get("report_dir")
+        if self.report_dir is None:
+            self.report_dir = os.path.join(os.getcwd(), "report_dir")
         self.report_filepath = self.kwargs.get(
             "report_filepath", os.path.join(self.report_dir, self.DEFAULT_REPORT_FILENAME)
         )
@@ -131,6 +134,7 @@ class Tester:
     
     def setup_at(self, **kwargs):
         force = kwargs.pop("force_setup", False)
+        debug = kwargs.get("debug", False)
         if self.is_setup and (not force):
             return self
         self.code_src.setup_at(self.report_dir, **kwargs)
@@ -139,12 +143,17 @@ class Tester:
             self.master_code_src.setup_at(self.report_dir, **kwargs)
         if self.master_tests_src is not None:
             self.master_tests_src.setup_at(self.report_dir, **kwargs)
+        if debug:
+            self.logging_func(f"self.code_src: {self.code_src}")
+            self.logging_func(f"self.tests_src: {self.tests_src}")
+            self.logging_func(f"self.master_code_src: {self.master_code_src}")
+            self.logging_func(f"self.master_tests_src: {self.master_tests_src}")
         return self
     
     def run(self, *args, **kwargs):
         self.weights.update(kwargs.pop("weights", {}))
         save_report = kwargs.pop("save_report", True)
-        clear_pytest_temporary_files = kwargs.pop("clear_pytest_temporary_files", True)
+        clear_pytest_temporary_files = kwargs.pop("clear_pytest_temporary_files", False)
         clear_temporary_files = kwargs.pop("clear_temporary_files", False)
         self.setup_at(**kwargs)
         self._run(**kwargs)
@@ -282,3 +291,18 @@ class Tester:
         self.clear_pytest_temporary_files()
         for src in self.all_sources:
             src.clear_temporary_files()
+
+    def push_report_to(self, push_report_to: Optional[str] = "auto", **kwargs) -> "Tester":
+        if push_report_to is None or push_report_to == "auto":
+            push_report_to = self.kwargs.get("push_report_to", push_report_to)
+        if push_report_to is None or push_report_to == "auto":
+            self.logging_func(f"trying to detect git repo url from {self.code_src.working_dir}")
+            push_report_to = utils.get_git_repo_url(self.code_src.working_dir)
+        if push_report_to is None:
+            warnings.warn(
+                f"Could not detect git repo url from {push_report_to=} nor {self.code_src.working_dir}",
+                RuntimeWarning
+            )
+            return self
+        utils.push_file_to_git_repo(self.report_filepath, push_report_to, **kwargs)
+        return self

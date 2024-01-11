@@ -182,8 +182,9 @@ class Source:
         if self.local_repo_tmp_dirpath is None:
             return
         if os.path.exists(self.local_repo_tmp_dirpath):
+            from git import rmtree
             try:
-                utils.try_rmtree(self.local_repo_tmp_dirpath)
+                rmtree(self.local_repo_tmp_dirpath)
             except PermissionError:
                 self.logging_func(
                     f"Could not remove repo {self.repo_name} at {self.local_repo_tmp_dirpath}. "
