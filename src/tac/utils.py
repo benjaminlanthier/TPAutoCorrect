@@ -263,7 +263,7 @@ def push_file_to_git_repo(
     return True
 
 
-def get_git_repo_url(working_dir: str, search_parent_directories: bool = False) -> Optional[str]:
+def get_git_repo_url(working_dir: str, search_parent_directories: bool = True) -> Optional[str]:
     try:
         import git
         repo = git.Repo(working_dir, search_parent_directories=search_parent_directories)
