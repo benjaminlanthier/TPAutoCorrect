@@ -243,3 +243,30 @@ def import_obj_from_file(obj_name: str, filepath: str):
     return obj
 
 
+def push_file_to_git_repo(
+        filepath: str,
+        repo_url: str,
+        repo_branch: str = "main",
+        local_tmp_path: str = "tmp_repo",
+        rm_tmp_repo: bool = True,
+):
+    import git
+    from git import rmtree
+    repo = git.Repo.clone_from(repo_url, local_tmp_path)
+    repo.git.checkout(repo_branch)
+    shutil.copy(filepath, os.path.join("repo", filepath))
+    repo.git.add(filepath)
+    repo.git.commit("-m", f"Add {filepath}")
+    repo.git.push("origin", repo_branch)
+    if rm_tmp_repo:
+        rmtree(local_tmp_path)
+    return True
+
+
+def get_git_repo_url(working_dir: str, search_parent_directories: bool = False) -> Optional[str]:
+    try:
+        import git
+        repo = git.Repo(working_dir, search_parent_directories=search_parent_directories)
+        return repo.remotes.origin.url
+    except Exception:
+        return None
