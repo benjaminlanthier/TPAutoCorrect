@@ -59,6 +59,18 @@ def parse_args():
         help="Push report file to a git repository. "
              "If equal to 'auto' the repository of the current project will be used if found.",
     )
+    parser.add_argument(
+        "--clear-pytest-temporary-files",
+        action="store_true",
+        help="Clear pytest temporary files.",
+    )
+    for key, default_weight in Tester.DEFAULT_WEIGHTS.items():
+        parser.add_argument(
+            f"--{key}-weight",
+            type=float,
+            default=default_weight,
+            help=f"Weight of the {key} test in the final score.",
+        )
     return parser.parse_args()
 
 
@@ -75,14 +87,24 @@ def main():
         master_tests_source = None
     else:
         master_tests_source = SourceMasterTests(src_path=args.master_tests_src_path)
+    weights = Tester.DEFAULT_WEIGHTS.copy()
+    weights.update({
+        key: getattr(args, f"{key}_weight", default_weight)
+        for key, default_weight in Tester.DEFAULT_WEIGHTS.items()
+    })
     tester = Tester(
         code_source, test_source,
         master_code_src=master_code_source,
         master_tests_src=master_tests_source,
         report_dir=args.report_dir,
         logging_func=logging_func,
+        weights=weights,
     )
-    tester.run(overwrite=args.overwrite, debug=args.debug)
+    tester.run(
+        overwrite=args.overwrite,
+        debug=args.debug,
+        clear_pytest_temporary_files=args.clear_pytest_temporary_files
+    )
     if args.push_report_to is not None:
         tester.push_report_to(args.push_report_to)
 
