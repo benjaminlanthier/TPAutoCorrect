@@ -254,9 +254,10 @@ def push_file_to_git_repo(
     from git import rmtree
     repo = git.Repo.clone_from(repo_url, local_tmp_path)
     repo.git.checkout(repo_branch)
-    shutil.copy(filepath, os.path.join("repo", filepath))
-    repo.git.add(filepath)
-    repo.git.commit("-m", f"Add {filepath}")
+    new_filepath = os.path.join(local_tmp_path, os.path.basename(filepath))
+    shutil.copy(filepath, new_filepath)
+    repo.git.add(new_filepath)
+    repo.git.commit("-m", f"Add {new_filepath}")
     repo.git.push("origin", repo_branch)
     if rm_tmp_repo:
         rmtree(local_tmp_path)
