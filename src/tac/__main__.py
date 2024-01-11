@@ -116,8 +116,7 @@ def main():
         try:
             tester.push_report_to(args.push_report_to)
         except Exception as err:
-            if args.debug:
-                tester.logging_func(f"Error while pushing report to {args.push_report_to}: {err}")
+            tester.logging_func(f"Error while pushing report to {args.push_report_to}: {err}")
     if args.rm_report_dir:
         tester.rm_report_dir()
 
