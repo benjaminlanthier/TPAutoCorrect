@@ -1,15 +1,60 @@
 import json
+from typing import Callable, Optional
 
 import numpy as np
 
 
 class Report:
+    """
+    Class for storing and manipulating data for a report.
+
+    :param data: The data to store in the report.
+    :type data: dict
+    :param report_filepath: The filepath to save or load the report.
+    :type report_filepath: str
+    :param args: Additional positional arguments.
+    :type args: tuple
+    :param kwargs: Additional keyword arguments.
+    :type kwargs: dict
+
+    :keyword grade_min: The minimum grade for the report.
+    :type grade_min: float
+    :keyword grade_min_value: The value of the report when the grade is the minimum.
+    :type grade_min_value: float
+    :keyword grade_max: The maximum grade for the report.
+    :type grade_max: float
+    :keyword grade_norm_func: The function to use to normalize the grade.
+    :type grade_norm_func: Callable[[float], float]
+
+    Note: The grade is calculated as follows:
+        grade = (grade_max - grade_min_value) * (weighted sum of values - grade_min) / (grade_max - grade_min) + grade_min_value
+        grade = grade_norm_func(grade)
+
+    :ivar data: The data stored in the report.
+    :vartype data: dict
+    :ivar report_filepath: The filepath to save or load the report.
+    :vartype report_filepath: str
+    :ivar grade_min: The minimum grade for the report.
+    :vartype grade_min: float
+    :ivar grade_max: The maximum grade for the report.
+    :vartype grade_max: float
+    :ivar grade_norm_func: The function to use to normalize the grade.
+    :vartype grade_norm_func: Callable[[float], float]
+    :ivar args: Additional positional arguments.
+    :vartype args: tuple
+    :ivar kwargs: Additional keyword arguments.
+    :vartype kwargs: dict
+    """
     VALUE_KEY = "value"
     WEIGHT_KEY = "weight"
     
     def __init__(self, data: dict = None, report_filepath: str = None, *args, **kwargs):
         self.data = data
         self.report_filepath = report_filepath
+        self.grade_min = kwargs.pop("grade_min", 0.0)
+        self.grade_min_value = kwargs.pop("grade_min_value", 0.0)
+        self.grade_max = kwargs.pop("grade_max", 100.0)
+        self.grade_norm_func: Optional[Callable[[float], float]] = kwargs.pop("grade_norm_func", None)
         self.args = args
         self.kwargs = kwargs
         
@@ -104,6 +149,10 @@ class Report:
         else:
             report = self.get_normalized()
         grade = sum([report.get_weighted(k) for k in report.keys()])
+        grade_scale = self.grade_max - self.grade_min
+        grade = (self.grade_max - self.grade_min_value) * (grade - self.grade_min) / grade_scale + self.grade_min_value
+        if self.grade_norm_func is not None:
+            grade = self.grade_norm_func(grade)
         return grade
     
     def save(self, report_filepath: str = None):
