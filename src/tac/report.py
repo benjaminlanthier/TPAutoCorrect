@@ -46,13 +46,16 @@ class Report:
     """
     VALUE_KEY = "value"
     WEIGHT_KEY = "weight"
+    DEFAULT_GRADE_MIN = 0.0
+    DEFAULT_GRADE_MAX = 100.0
+    DEFAULT_GRADE_MIN_VALUE = 0.0
     
     def __init__(self, data: dict = None, report_filepath: str = None, *args, **kwargs):
         self.data = data
         self.report_filepath = report_filepath
-        self.grade_min = kwargs.pop("grade_min", 0.0)
-        self.grade_min_value = kwargs.pop("grade_min_value", 0.0)
-        self.grade_max = kwargs.pop("grade_max", 100.0)
+        self.grade_min = kwargs.pop("grade_min", self.DEFAULT_GRADE_MIN)
+        self.grade_min_value = kwargs.pop("grade_min_value", self.DEFAULT_GRADE_MIN_VALUE)
+        self.grade_max = kwargs.pop("grade_max", self.DEFAULT_GRADE_MAX)
         self.grade_norm_func: Optional[Callable[[float], float]] = kwargs.pop("grade_norm_func", None)
         self.args = args
         self.kwargs = kwargs

@@ -38,6 +38,7 @@ class Tester:
             *,
             master_code_src: Optional[SourceCode] = None,
             master_tests_src: Optional[SourceTests] = None,
+            report_kwargs: Optional[dict] = None,
             **kwargs
     ):
         if code_src is None:
@@ -59,7 +60,8 @@ class Tester:
         self.report_filepath = self.kwargs.get(
             "report_filepath", os.path.join(self.report_dir, self.DEFAULT_REPORT_FILENAME)
         )
-        self.report = Report(report_filepath=self.report_filepath)
+        report_kwargs = report_kwargs or {}
+        self.report = Report(report_filepath=self.report_filepath, **report_kwargs)
         self.weights = self.kwargs.get("weights", self.DEFAULT_WEIGHTS)
     
     @property
@@ -307,6 +309,7 @@ class Tester:
             )
             return self
         kwargs.setdefault("local_tmp_path", os.path.join(self.report_dir, "tmp_repo"))
+        self.report.save(self.report_filepath)
         utils.push_file_to_git_repo(self.report_filepath, push_report_to, **kwargs)
         return self
 

@@ -146,7 +146,8 @@ class Source:
         self.repo.git.pull()
         if self._src_path is None:
             self._src_path = self._try_find_default_src_dir(root=self.local_repo_tmp_dirpath)
-        self._src_path = os.path.join(self.local_repo_tmp_dirpath, self.src_path)
+        else:
+            self._src_path = os.path.join(self.local_repo_tmp_dirpath, self.src_path)
         return self.repo
     
     def setup_at(self, dst_path: str = None, overwrite=False, **kwargs) -> str:

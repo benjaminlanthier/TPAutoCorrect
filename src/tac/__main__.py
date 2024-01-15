@@ -7,6 +7,7 @@ from . import (
     SourceMasterCode,
     SourceMasterTests,
     Tester,
+    Report,
 )
 
 
@@ -19,10 +20,22 @@ def parse_args():
         help="Path to the directory containing the code to be tested.",
     )
     parser.add_argument(
+        "--code-src-url",
+        type=str,
+        default=None,
+        help="URL to the git repository containing the code to be tested.",
+    )
+    parser.add_argument(
         "--tests-src-path",
         type=str,
         default=None,
         help="Path to the directory containing the tests for the code to be tested.",
+    )
+    parser.add_argument(
+        "--tests-src-url",
+        type=str,
+        default=None,
+        help="URL to the git repository containing the tests for the code to be tested.",
     )
     parser.add_argument(
         "--master-code-src-path",
@@ -31,10 +44,22 @@ def parse_args():
         help="Path to the directory containing the master code to be tested.",
     )
     parser.add_argument(
+        "--master-code-src-url",
+        type=str,
+        default=None,
+        help="URL to the git repository containing the master code to be tested.",
+    )
+    parser.add_argument(
         "--master-tests-src-path",
         type=str,
         default=None,
         help="Path to the directory containing the master tests for the code to be tested.",
+    )
+    parser.add_argument(
+        "--master-tests-src-url",
+        type=str,
+        default=None,
+        help="URL to the git repository containing the master tests for the code to be tested.",
     )
     parser.add_argument(
         "--report-dir",
@@ -53,7 +78,7 @@ def parse_args():
         help="Print debug messages.",
     )
     parser.add_argument(
-        "--push_report_to",
+        "--push-report-to",
         type=str,
         default=None,
         help="Push report file to a git repository. "
@@ -78,27 +103,50 @@ def parse_args():
              "This option is useful when the report file is pushed to a git repository"
              " and the report directory is no longer needed.",
     )
+    parser.add_argument(
+        "--grade-min",
+        type=float,
+        default=Report.DEFAULT_GRADE_MIN,
+        help="Minimum grade.",
+    )
+    parser.add_argument(
+        "--grade-min-value",
+        type=float,
+        default=Report.DEFAULT_GRADE_MIN_VALUE,
+        help="Minimum grade value.",
+    )
+    parser.add_argument(
+        "--grade-max",
+        type=float,
+        default=Report.DEFAULT_GRADE_MAX,
+        help="Maximum grade.",
+    )
     return parser.parse_args()
 
 
 def main():
     args = parse_args()
-    code_source = SourceCode(src_path=args.code_src_path)
-    test_source = SourceTests(src_path=args.tests_src_path)
+    code_source = SourceCode(src_path=args.code_src_path, url=args.code_src_url)
+    test_source = SourceTests(src_path=args.tests_src_path, url=args.tests_src_url)
     logging_func = print if args.debug else Tester.DEFAULT_LOGGING_FUNC
-    if args.master_code_src_path is None:
+    if args.master_code_src_path is None and args.master_code_src_url is None:
         master_code_source = None
     else:
-        master_code_source = SourceMasterCode(src_path=args.master_code_src_path)
-    if args.master_tests_src_path is None:
+        master_code_source = SourceMasterCode(src_path=args.master_code_src_path, url=args.master_code_src_url)
+    if args.master_tests_src_path is None and args.master_tests_src_url is None:
         master_tests_source = None
     else:
-        master_tests_source = SourceMasterTests(src_path=args.master_tests_src_path)
+        master_tests_source = SourceMasterTests(src_path=args.master_tests_src_path, url=args.master_tests_src_url)
     weights = Tester.DEFAULT_WEIGHTS.copy()
     weights.update({
         key: getattr(args, f"{key}_weight", default_weight)
         for key, default_weight in Tester.DEFAULT_WEIGHTS.items()
     })
+    report_kwargs = {
+        "grade_min": args.grade_min,
+        "grade_min_value": args.grade_min_value,
+        "grade_max": args.grade_max,
+    }
     tester = Tester(
         code_source, test_source,
         master_code_src=master_code_source,
@@ -106,6 +154,7 @@ def main():
         report_dir=args.report_dir,
         logging_func=logging_func,
         weights=weights,
+        report_kwargs=report_kwargs,
     )
     tester.run(
         overwrite=args.overwrite,
