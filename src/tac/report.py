@@ -15,7 +15,6 @@ class Report:
     :param args: Additional positional arguments.
     :type args: tuple
     :param kwargs: Additional keyword arguments.
-    :type kwargs: dict
 
     :keyword grade_min: The minimum grade for the report.
     :type grade_min: float
