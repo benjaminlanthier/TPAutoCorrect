@@ -3,7 +3,7 @@ import os
 import shutil
 import subprocess
 import sys
-from typing import Optional
+from typing import Optional, List
 
 from . import utils
 
@@ -247,6 +247,7 @@ class SourceCode(Source):
         self.code_root_folder = kwargs.get("code_root_folder", self.DEFAULT_CODE_ROOT_FOLDER)
         self.venv = kwargs.get("venv", self.DEFAULT_VENV)
         self.reqs_path = kwargs.get("requirements_path", None)
+        self.additional_requirements = kwargs.get("additional_requirements", [])
     
     @property
     def venv_path(self) -> Optional[str]:
@@ -257,6 +258,10 @@ class SourceCode(Source):
     @property
     def is_venv_created(self) -> bool:
         return os.path.exists(self.venv_path)
+
+    def add_requirements(self, requirements: List[str]):
+        self.additional_requirements.extend(requirements)
+        return self
     
     def find_requirements_path(self) -> Optional[str]:
         local_root = os.path.join(self.src_path, "..")
@@ -284,22 +289,26 @@ class SourceCode(Source):
     
     def get_venv_scripts_folder(self) -> str:
         return self.VENV_SCRIPTS_FOLDER_BY_OS[sys.platform].format(self.venv_path)
-    
+
     def get_venv_python_path(self) -> str:
-        return os.path.join(
-            self.get_venv_scripts_folder(),
-            "python"
-        )
+        return self.get_venv_module_path("python")
+
+    def get_venv_module_path(self, module_name: str) -> str:
+        return os.path.join(self.get_venv_scripts_folder(), module_name)
     
     def install_requirements(self):
         if self.reqs_path is None:
             self.reqs_path = self.find_requirements_path()
         if self.reqs_path is None:
             return "No requirements.txt file found."
-        return self.send_cmd_to_process(
+        std_out = self.send_cmd_to_process(
             f"{self.get_venv_python_path()} -m pip install -r {self.reqs_path}",
-            cwd=self.working_dir
+            # cwd=self.working_dir
+            cwd=os.getcwd()
         )
+        for req in self.additional_requirements:
+            self.send_cmd_to_process(f"{self.get_venv_python_path()} -m pip install {req}",  cwd=os.getcwd())
+        return std_out
     
     def send_cmd_to_process(
             self,
