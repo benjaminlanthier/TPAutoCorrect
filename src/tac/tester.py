@@ -200,7 +200,8 @@ class Tester:
         options = self.get_pytest_plugins_options(
             add_cov=True, add_json_report=True, json_report_file=self.DOT_JSON_REPORT_NAME, **kwargs
         )
-        cmd = f"pytest {' '.join(options)} {self.tests_src.local_path}"
+        pytest_path = self.code_src.get_venv_module_path("pytest")
+        cmd = f"{pytest_path} {' '.join(options)} {self.tests_src.local_path}"
         if kwargs.get("debug", False):
             self.logging_func(f"os.system: {cmd}")
         os.system(cmd)
@@ -213,7 +214,8 @@ class Tester:
         options = self.get_pytest_plugins_options(
             add_cov=False, add_json_report=True, json_report_file=self.MASTER_DOT_JSON_REPORT_NAME, **kwargs
         )
-        cmd = f"pytest {' '.join(options)} {self.master_tests_src.local_path}"
+        pytest_path = self.master_code_src.get_venv_module_path("pytest")
+        cmd = f"{pytest_path} {' '.join(options)} {self.master_tests_src.local_path}"
         if kwargs.get("debug", False):
             self.logging_func(f"os.system: {cmd}")
         os.system(cmd)
