@@ -161,6 +161,7 @@ def main():
         debug=args.debug,
         clear_pytest_temporary_files=args.clear_pytest_temporary_files
     )
+    report = tester.report
     if args.push_report_to is not None:
         try:
             tester.push_report_to(args.push_report_to)
@@ -168,6 +169,7 @@ def main():
             tester.logging_func(f"Error while pushing report to {args.push_report_to}: {err}")
     if args.rm_report_dir:
         tester.rm_report_dir()
+    return f"Points {int(report.grade)}/100"
 
 
 if __name__ == '__main__':
