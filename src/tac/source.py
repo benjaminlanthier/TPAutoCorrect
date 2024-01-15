@@ -18,8 +18,6 @@ class Source:
     
     def __init__(self, src_path: Optional[str] = None, *args, **kwargs):
         self._src_path = src_path
-        if self._src_path is None:
-            self._src_path = self._try_find_default_src_dir()
         self.args = args
         self.kwargs = kwargs
         
@@ -49,6 +47,8 @@ class Source:
         :return: The source path of the object.
         :rtype: str
         """
+        if self._src_path is None:
+            return self._try_find_default_src_dir()
         return self._src_path
     
     @property
@@ -106,10 +106,10 @@ class Source:
     def local_repo_tmp_dirpath(self) -> str:
         return os.path.join(self.working_dir, self.local_repo_tmp_dirname)
     
-    def _try_find_default_src_dir(self) -> Optional[str]:
-        if self.src_path is not None:
-            return self.src_path
-        dirpath = utils.find_dir(self.DEFAULT_SRC_DIRNAME)
+    def _try_find_default_src_dir(self, root: Optional[str] = None) -> Optional[str]:
+        if self._src_path is not None:
+            return self._src_path
+        dirpath = utils.find_dir(self.DEFAULT_SRC_DIRNAME, root=root)
         if dirpath is None:
             raise ValueError(
                 f"Could not find default source directory {self.DEFAULT_SRC_DIRNAME}."
@@ -122,8 +122,9 @@ class Source:
             utils.try_rmtree(self.local_path, ignore_errors=True)
         if self.is_remote:
             self._clone_repo()
-        else:
-            shutil.copytree(self.src_path, self.local_path, dirs_exist_ok=True)
+        if self._src_path is None:
+            self._src_path = self._try_find_default_src_dir()
+        shutil.copytree(self.src_path, self.local_path, dirs_exist_ok=True)
     
     def _clone_repo(self):
         import git
@@ -143,8 +144,9 @@ class Source:
             )
         self.repo.git.checkout(self.repo_branch)
         self.repo.git.pull()
-        src_repo_path = os.path.join(self.local_repo_tmp_dirpath, self.src_path)
-        shutil.copytree(src_repo_path, self.local_path, dirs_exist_ok=True)
+        if self._src_path is None:
+            self._src_path = self._try_find_default_src_dir(root=self.local_repo_tmp_dirpath)
+        self._src_path = os.path.join(self.local_repo_tmp_dirpath, self.src_path)
         return self.repo
     
     def setup_at(self, dst_path: str = None, overwrite=False, **kwargs) -> str:
@@ -244,7 +246,7 @@ class SourceCode(Source):
         super().__init__(src_path, *args, **kwargs)
         self.code_root_folder = kwargs.get("code_root_folder", self.DEFAULT_CODE_ROOT_FOLDER)
         self.venv = kwargs.get("venv", self.DEFAULT_VENV)
-        self.reqs_path = kwargs.get("requirements_path", self.find_requirements_path())
+        self.reqs_path = kwargs.get("requirements_path", None)
     
     @property
     def venv_path(self) -> Optional[str]:
@@ -290,6 +292,8 @@ class SourceCode(Source):
         )
     
     def install_requirements(self):
+        if self.reqs_path is None:
+            self.reqs_path = self.find_requirements_path()
         if self.reqs_path is None:
             return "No requirements.txt file found."
         return self.send_cmd_to_process(
