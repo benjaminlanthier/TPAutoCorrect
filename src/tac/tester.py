@@ -231,8 +231,12 @@ class Tester:
         :return: code coverage
         :rtype: float
         """
-        coverage_file = utils.reindent_json_file(self.coverage_json_path)
-        coverage_data = json.load(open(coverage_file))
+        try:
+            coverage_file = utils.reindent_json_file(self.coverage_json_path)
+            coverage_data = json.load(open(coverage_file))
+        except Exception as err:
+            warnings.warn(f"Could not reindent or load {self.coverage_json_path=} -> {err}")
+            return 0.0
         summaries = [
             d["summary"]
             for f, d in coverage_data["files"].items()
