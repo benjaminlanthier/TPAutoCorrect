@@ -53,7 +53,7 @@ class PEP8TestCase(TestCase):
         output = StringIO()
         sys.stdout = output
         try:
-            Run([self.files_dir, '--exit-zero'])
+            Run([self.files_dir, f'--max-line-length={self.MAX_LINE_LENGTH}', '--exit-zero'])
         except SystemExit:
             pass
         sys.stdout = sys.__stdout__
