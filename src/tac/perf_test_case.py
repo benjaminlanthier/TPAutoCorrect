@@ -66,7 +66,7 @@ class PEP8TestCase(TestCase):
         else:
             return None, None
 
-    def run(self, method: str):
+    def run(self, method: str = "pylint"):
         assert method in self.methods, f"{method} is not implemented yet, please choose between: {self.methods}"
         run_method_command = self._method_commands[method]
         percent_value, message = run_method_command()
