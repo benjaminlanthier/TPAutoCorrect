@@ -26,19 +26,14 @@ class TestCase:
         pass
 
 
-class PEP8TestCase(TestCase):
+class PEP8TestCasePyCodeStyle(TestCase):
     MAX_LINE_LENGTH = 120
-    methods = {"pycodestyle", "pylint"}
     
     def __init__(self, name: str, files_dir: str):
         self.name = name
         self.files_dir = files_dir
-        self._method_commands = {
-            "pycodestyle": self._run_pycodestyle,
-            "pylint": self._run_pylint,
-        }
 
-    def _run_pycodestyle(self):
+    def run(self):
         pep8style = pycodestyle.StyleGuide(ignore="W191,E501", max_line_length=self.MAX_LINE_LENGTH, quiet=True)
         result = pep8style.check_files([self.files_dir])
         message = ', '.join(set([f"{key}:'{err_msg}'" for key, err_msg in result.messages.items()]))
@@ -47,7 +42,15 @@ class PEP8TestCase(TestCase):
         else:
             err_ratio = result.total_errors / result.counters['physical lines']
         percent_value = np.clip(100.0 - (err_ratio * 100.0), 0.0, 100.0).item()
-        return percent_value, message # TestResult(self.name, percent_value, message=message)
+        return TestResult(self.name, percent_value, message=message)
+
+
+class PEP8TestCasePylint(TestCase):
+    MAX_LINE_LENGTH = 120
+    
+    def __init__(self, name: str, files_dir: str):
+        self.name = name
+        self.files_dir = files_dir
 
     def _run_pylint(self):
         output = StringIO()
@@ -62,12 +65,9 @@ class PEP8TestCase(TestCase):
         if match:
             score = float(match.group(1))
             percent_value = 10 * score
-            return percent_value, None # TestResult(self.name, score, message=None)
+            return TestResult(self.name, percent_value, message=None)
         else:
             return None, None
 
-    def run(self, method: str = "pylint"):
-        assert method in self.methods, f"{method} is not implemented yet, please choose between: {self.methods}"
-        run_method_command = self._method_commands[method]
-        percent_value, message = run_method_command()
-        return TestResult(self.name, percent_value, message=message)
+
+PEP8TestCase = PEP8TestCasePylint
